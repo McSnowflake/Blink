@@ -1,5 +1,11 @@
-#include <Arduino.h>
+/**
+Author: Martin Weise
+**/
 
+#include <Arduino.h>
+//#include <vector>
+
+const auto d = 0.0;
 const byte ledPin = 4;
 const byte interruptPin = 3;
 volatile byte state = LOW;
