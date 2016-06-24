@@ -3,10 +3,12 @@ Author: Martin Weise
 **/
 
 #include <Arduino.h>
-//#include <vector>
+#include <LiquidCrystal.h>
+#include "TimerOne.h"
 
-const auto d = 0.0;
-const byte ledPin = 4;
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+const auto ledPin = 4;
 const byte interruptPin = 3;
 volatile byte state = LOW;
 
@@ -18,12 +20,17 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), blink, CHANGE);
+
+Timer1.initialize(500000);         // initialize timer1, and set a 1/2 second period
+//Timer1.pwm(9, 512);                // setup pwm on pin 9, 50% duty cycle
+Timer1.attachInterrupt(blink);  // attaches callback() as a timer overflow interrupt
+
 }
 
 void loop() {
   Serial.println(state);
   digitalWrite(ledPin, state);
-  delay(1000);
+  delay(100);
 }
 
 void blink() {
