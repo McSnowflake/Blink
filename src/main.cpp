@@ -15,13 +15,16 @@ Author: Martin Weise & Franziskus Wild
 DHT22 myDHT22(DHT22_PIN);
 LiquidCrystal lcd(12, 11, 7, 6, 5, 4);
 
-volatile byte state = LOW;
-volatile byte ready = 0;
+volatile byte state = 0;
+volatile byte change = 0;
 volatile byte counter = 0;
 const byte limit = 1;
 
-void switch_on_LCD();
-void switch_off_LCD();
+void turnOnLCD();
+void turnOffLCD();
+void meassure();
+void timerISR();
+void buttonISR();
 
 void setup() {
   // setup LCD and start it with light off
@@ -30,49 +33,78 @@ void setup() {
   digitalWrite(LCD_PIN, LOW);
   lcd.setCursor(0, 0);
   lcd.print("Starting ...");
-  delay(500);
+  delay(100);
 
   // set up serial com
   Serial.begin(9600);
   Serial.println("Starting ...");
-  delay(500);
+  delay(100);
 
   // setup the timer interupt
-  Timer1.initialize(3000000);         // initialize timer1, and set a 1/2 second period
-  Timer1.attachInterrupt(switch_off_LCD);
+  Timer1.initialize(3000000);
+  Timer1.attachInterrupt(timerISR);
   Timer1.stop();
   Serial.println("Timer initialized");
-  delay(500);
+  delay(100);
 
   // initialize The temeraturee sensor
   myDHT22.readData();
-  myDHT22.getTemperatureC();
-  myDHT22.getHumidity();
   Serial.println("Temp Sensor initialized");
-  delay(500);
+  delay(100);
 
   // setup the LCD toggle interupt
   pinMode(IRQ_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(IRQ_PIN), switch_on_LCD, FALLING);
+  attachInterrupt(digitalPinToInterrupt(IRQ_PIN), buttonISR, FALLING);
+  state = 0;
   Serial.println("LCD IRQ initialized");
-  delay(500);
+  delay(100);
 
 
   Serial.println("Ready           ");
   lcd.setCursor(0, 0);
   lcd.print("Ready           ");
   counter = limit;
-
   Timer1.start();
-  ready = 1;
 }
 
 void loop() {
+  delay(100);
+  if (state != 0)
+    meassure();
+  if (change == 1) {
+    switch (state) {
+      case 0: turnOffLCD();
+              Timer1.stop();
+              break;
+      case 1: turnOnLCD();
+              delay(500);
+              if (digitalRead(IRQ_PIN) == HIGH) {
+                counter = 0;
+                Timer1.start();
+              } else {
+                Serial.println("long press");
+                state = 2;
+              }
+              break;
+    }
+    change = 0;
+  }
+}
 
-  delay(1000);
+void turnOffLCD() {
+  Serial.println("Off");
+  lcd.noDisplay();
+  digitalWrite(LCD_PIN, HIGH);
+}
+
+void turnOnLCD() {
+  Serial.println("On");
+  lcd.display();
+  digitalWrite(LCD_PIN, LOW);
 }
 
 void meassure() {
+  Serial.println("Measuring");
   myDHT22.readData();
   lcd.setCursor(0, 0);
   lcd.print("Temp.: ");
@@ -85,28 +117,24 @@ void meassure() {
   lcd.print("%    ");
 }
 
-void switch_on_LCD() {
-  if (state == LOW) {
-    meassure();
-    state = HIGH;
-    Serial.println("On");
-    lcd.display();
-    digitalWrite(LCD_PIN, LOW);
-    Timer1.start();
-  } else {
-    counter = 0;
+void buttonISR() {
+  Serial.println("Button IRQ");
+  change = 1;
+  switch (state) {
+    case 0: state = 1;
+    break;
+    case 1: counter = 0;
+    break;
+    case 2: state = 0;
+    break;
   }
 }
 
-void switch_off_LCD() {
-  if (ready == 1)
+void timerISR() {
+  Serial.println("Timer IRQ");
   if (counter == limit) {
-    Serial.println("Off");
-    lcd.noDisplay();
-    state = LOW;
-    digitalWrite(LCD_PIN, HIGH);
-    Timer1.stop();
-    counter = 0;
+    state = 0;
+    change = 1;
   } else {
     counter = counter + 1;
     Serial.println(counter);
